@@ -42,6 +42,11 @@ async function run() {
       const result = await serviceCollection.findOne(query);
       res.send(result);
     });
+    app.get("/latest-services", async (req, res) => {
+      const cursor = serviceCollection.find().sort({ createdAt: 1 }).limit(6);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
 
     app.post("/services", async (req, res) => {
       const newService = req.body;
