@@ -65,11 +65,12 @@ async function run() {
     app.post("/bookings", async (req, res) => {
       const booking = req.body;
       const serviceIdString = booking.serviceId;
+      const userEmail = booking.userEmail;
       let serviceObjectId;
+
       try {
         serviceObjectId = new ObjectId(serviceIdString);
       } catch (e) {
-        console.error("Invalid serviceId format:", serviceIdString);
         return res
           .status(400)
           .send({ message: "Invalid service ID provided." });
