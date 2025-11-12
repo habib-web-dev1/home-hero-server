@@ -102,6 +102,68 @@ async function run() {
       res.send(result);
     });
 
+    app.delete("/bookings/:id", async (req, res) => {
+      const id = req.params.id;
+      let bookingObjectId;
+      try {
+        bookingObjectId = new ObjectId(id);
+      } catch (e) {
+        return res.status(400).send({ message: "Invalid booking ID format." });
+      }
+      const query = { _id: bookingObjectId };
+      const result = await bookingCollection.deleteOne(query);
+
+      if (result.deletedCount === 1) {
+        res.send({ success: true, message: "Booking deleted successfully." });
+      } else {
+        res.status(404).send({ success: false, message: "Booking not found." });
+      }
+    });
+    app.post("/services/:serviceId/review", async (req, res) => {
+      const serviceIdString = req.params.serviceId;
+      const reviewData = req.body;
+      let serviceObjectId;
+      try {
+        serviceObjectId = new ObjectId(serviceIdString);
+      } catch (e) {
+        console.error("Invalid serviceId format for review:", serviceIdString);
+        return res
+          .status(400)
+          .send({ success: false, message: "Invalid service ID format." });
+      }
+
+      const reviewToInsert = {
+        ...reviewData,
+        date: new Date(reviewData.date),
+        rating: parseInt(reviewData.rating),
+      };
+
+      try {
+        const updateResult = await serviceCollection.updateOne(
+          { _id: serviceObjectId },
+          { $push: { reviews: reviewToInsert } }
+        );
+
+        if (updateResult.modifiedCount === 1) {
+          res.send({ success: true, message: "Review added successfully." });
+        } else if (updateResult.matchedCount === 0) {
+          res
+            .status(404)
+            .send({ success: false, message: "Service not found." });
+        } else {
+          res.status(500).send({
+            success: false,
+            message: "Failed to update service with review.",
+          });
+        }
+      } catch (error) {
+        console.error("Error adding review:", error);
+        res.status(500).send({
+          success: false,
+          message: "Internal server error during review submission.",
+        });
+      }
+    });
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
