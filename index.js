@@ -10,7 +10,7 @@ app.use(cors());
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@ahserver.lso3nfx.mongodb.net/?appName=AHServer`;
-
+// create client
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -57,7 +57,6 @@ async function run() {
           reviewCount: -1,
           averageRating: -1,
         };
-
         const cursor = serviceCollection.find({}).sort(sortCriteria).limit(6);
 
         const result = await cursor.toArray();
