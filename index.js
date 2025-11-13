@@ -51,9 +51,21 @@ async function run() {
     });
 
     app.get("/latest-services", async (req, res) => {
-      const cursor = serviceCollection.find().sort({ createdAt: 1 }).limit(6);
-      const result = await cursor.toArray();
-      res.send(result);
+      try {
+        const sortCriteria = {
+          createdAt: -1,
+          reviewCount: -1,
+          averageRating: -1,
+        };
+
+        const cursor = serviceCollection.find({}).sort(sortCriteria).limit(6);
+
+        const result = await cursor.toArray();
+        res.send(result);
+      } catch (error) {
+        console.error("Error fetching top-rated services:", error);
+        res.status(500).send({ message: "Failed to fetch top services." });
+      }
     });
 
     app.post("/services", async (req, res) => {
@@ -146,7 +158,37 @@ async function run() {
         );
 
         if (updateResult.modifiedCount === 1) {
-          res.send({ success: true, message: "Review added successfully." });
+          const updatedService = await serviceCollection.findOne({
+            _id: serviceObjectId,
+          });
+
+          if (updatedService && updatedService.reviews) {
+            const reviews = updatedService.reviews;
+            const totalReviews = reviews.length;
+
+            const ratingSum = reviews.reduce(
+              (sum, review) => sum + review.rating,
+              0
+            );
+
+            const newAverageRating =
+              totalReviews > 0 ? ratingSum / totalReviews : 0;
+
+            await serviceCollection.updateOne(
+              { _id: serviceObjectId },
+              {
+                $set: {
+                  averageRating: newAverageRating,
+                  reviewCount: totalReviews,
+                },
+              }
+            );
+          }
+
+          res.send({
+            success: true,
+            message: "Review added and rating updated successfully.",
+          });
         } else if (updateResult.matchedCount === 0) {
           res
             .status(404)
