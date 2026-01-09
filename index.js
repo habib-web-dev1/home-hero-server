@@ -2,12 +2,79 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// Enhanced Middleware
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "https://hero-home-service.web.app"],
+    credentials: true,
+  })
+);
+app.use(express.json({ limit: "10mb" }));
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  next();
+});
+
+// Error handling middleware
+const errorHandler = (err, req, res, next) => {
+  console.error("Error:", err);
+  res.status(500).json({
+    success: false,
+    message: "Internal server error",
+    error: process.env.NODE_ENV === "development" ? err.message : undefined,
+  });
+};
+
+// Input validation middleware
+const validateObjectId = (req, res, next) => {
+  const { id } = req.params;
+  if (!ObjectId.isValid(id)) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Invalid ID format" });
+  }
+  next();
+};
+
+const validateEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+const validateService = (service) => {
+  const required = [
+    "name",
+    "category",
+    "price",
+    "description",
+    "image",
+    "provider",
+  ];
+  const missing = required.filter((field) => !service[field]);
+
+  if (missing.length > 0) {
+    return {
+      valid: false,
+      message: `Missing required fields: ${missing.join(", ")}`,
+    };
+  }
+
+  if (typeof service.price !== "number" || service.price <= 0) {
+    return { valid: false, message: "Price must be a positive number" };
+  }
+
+  if (!service.provider.email || !validateEmail(service.provider.email)) {
+    return { valid: false, message: "Valid provider email is required" };
+  }
+
+  return { valid: true };
+};
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@ahserver.lso3nfx.mongodb.net/?appName=AHServer`;
 
@@ -21,7 +88,12 @@ const client = new MongoClient(uri, {
 });
 
 app.get("/", (req, res) => {
-  res.send("Hero Home Server Running");
+  res.json({
+    message: "HomeHero Server Running",
+    version: "2.0.0",
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 async function run() {
@@ -85,64 +157,224 @@ async function run() {
 
     // ================= SERVICE ROUTES =================
 
+    // Get all services with pagination and filtering
     app.get("/services", async (req, res) => {
-      const cursor = serviceCollection.find();
-      const result = await cursor.toArray();
-      res.send(result);
+      try {
+        const {
+          page = 1,
+          limit = 20,
+          category,
+          minPrice,
+          maxPrice,
+          search,
+          sortBy = "createdAt",
+          sortOrder = "desc",
+        } = req.query;
+
+        let query = {};
+
+        // Category filter
+        if (category && category !== "All Categories") {
+          query.category = category;
+        }
+
+        // Price range filter
+        if (minPrice || maxPrice) {
+          query.price = {};
+          if (minPrice) query.price.$gte = parseFloat(minPrice);
+          if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+        }
+
+        // Search filter
+        if (search) {
+          query.$or = [
+            { name: { $regex: search, $options: "i" } },
+            { description: { $regex: search, $options: "i" } },
+            { category: { $regex: search, $options: "i" } },
+            { "provider.name": { $regex: search, $options: "i" } },
+          ];
+        }
+
+        // Sorting
+        const sortOptions = {};
+        sortOptions[sortBy] = sortOrder === "desc" ? -1 : 1;
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const services = await serviceCollection
+          .find(query)
+          .sort(sortOptions)
+          .skip(skip)
+          .limit(parseInt(limit))
+          .toArray();
+
+        const total = await serviceCollection.countDocuments(query);
+
+        res.json({
+          success: true,
+          data: services,
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total,
+            pages: Math.ceil(total / parseInt(limit)),
+          },
+        });
+      } catch (error) {
+        console.error("Error fetching services:", error);
+        res
+          .status(500)
+          .json({ success: false, message: "Failed to fetch services" });
+      }
     });
 
-    app.get("/services/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await serviceCollection.findOne(query);
-      res.send(result);
+    app.get("/services/:id", validateObjectId, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await serviceCollection.findOne(query);
+
+        if (!result) {
+          return res
+            .status(404)
+            .json({ success: false, message: "Service not found" });
+        }
+
+        res.json({ success: true, data: result });
+      } catch (error) {
+        console.error("Error fetching service:", error);
+        res
+          .status(500)
+          .json({ success: false, message: "Failed to fetch service" });
+      }
     });
 
     app.get("/latest-services", async (req, res) => {
       try {
+        const { limit = 6 } = req.query;
         const sortCriteria = {
           createdAt: -1,
-          reviewCount: -1,
           averageRating: -1,
         };
         const result = await serviceCollection
           .find({})
           .sort(sortCriteria)
-          .limit(6)
+          .limit(parseInt(limit))
           .toArray();
-        res.send(result);
+        res.json({ success: true, data: result });
       } catch (error) {
-        res.status(500).send({ message: "Failed to fetch services." });
+        console.error("Error fetching latest services:", error);
+        res
+          .status(500)
+          .json({ success: false, message: "Failed to fetch services." });
       }
     });
 
     app.post("/services", async (req, res) => {
-      const newService = req.body;
-      const result = await serviceCollection.insertOne(newService);
-      res.send(result);
+      try {
+        const serviceData = req.body;
+
+        // Validate service data
+        const validation = validateService(serviceData);
+        if (!validation.valid) {
+          return res
+            .status(400)
+            .json({ success: false, message: validation.message });
+        }
+
+        const newService = {
+          ...serviceData,
+          price: parseFloat(serviceData.price),
+          reviews: [],
+          averageRating: 0,
+          reviewCount: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        const result = await serviceCollection.insertOne(newService);
+        res.status(201).json({ success: true, insertedId: result.insertedId });
+      } catch (error) {
+        console.error("Error creating service:", error);
+        res
+          .status(500)
+          .json({ success: false, message: "Failed to create service" });
+      }
     });
 
     app.get("/services/user/:email", async (req, res) => {
-      const email = req.params.email;
-      const query = { "provider.email": email };
-      const result = await serviceCollection.find(query).toArray();
-      res.send(result);
+      try {
+        const email = req.params.email;
+        if (!validateEmail(email)) {
+          return res
+            .status(400)
+            .json({ success: false, message: "Invalid email format" });
+        }
+
+        const query = { "provider.email": email };
+        const result = await serviceCollection
+          .find(query)
+          .sort({ createdAt: -1 })
+          .toArray();
+        res.json({ success: true, data: result });
+      } catch (error) {
+        console.error("Error fetching user services:", error);
+        res
+          .status(500)
+          .json({ success: false, message: "Failed to fetch services" });
+      }
     });
 
-    app.patch("/services/:id", async (req, res) => {
-      const id = req.params.id;
-      const updateService = req.body;
-      const query = { _id: new ObjectId(id) };
-      const update = { $set: updateService };
-      const result = await serviceCollection.updateOne(query, update);
-      res.send(result);
+    app.patch("/services/:id", validateObjectId, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const updateData = { ...req.body, updatedAt: new Date() };
+
+        // Remove fields that shouldn't be updated directly
+        delete updateData._id;
+        delete updateData.reviews;
+        delete updateData.averageRating;
+        delete updateData.reviewCount;
+        delete updateData.createdAt;
+
+        const query = { _id: new ObjectId(id) };
+        const update = { $set: updateData };
+        const result = await serviceCollection.updateOne(query, update);
+
+        if (result.matchedCount === 0) {
+          return res
+            .status(404)
+            .json({ success: false, message: "Service not found" });
+        }
+
+        res.json({ success: true, modifiedCount: result.modifiedCount });
+      } catch (error) {
+        console.error("Error updating service:", error);
+        res
+          .status(500)
+          .json({ success: false, message: "Failed to update service" });
+      }
     });
 
-    app.delete("/services/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await serviceCollection.deleteOne(query);
-      res.send(result);
+    app.delete("/services/:id", validateObjectId, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await serviceCollection.deleteOne(query);
+
+        if (result.deletedCount === 0) {
+          return res
+            .status(404)
+            .json({ success: false, message: "Service not found" });
+        }
+
+        res.json({ success: true, deletedCount: result.deletedCount });
+      } catch (error) {
+        console.error("Error deleting service:", error);
+        res
+          .status(500)
+          .json({ success: false, message: "Failed to delete service" });
+      }
     });
 
     // ================= BOOKING ROUTES =================
@@ -287,9 +519,20 @@ async function run() {
       res.send({ bookingCount, totalSpent, reviewCount: 0, pendingCount: 0 });
     });
     console.log("Connected to MongoDB successfully!");
+  } catch (error) {
+    console.error("MongoDB connection error:", error);
   } finally {
+    // Don't close the connection in serverless environments
   }
 }
+
+// Use error handling middleware
+app.use(errorHandler);
+
+// 404 handler - catch all unmatched routes
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: "Route not found" });
+});
 
 run().catch(console.dir);
 
