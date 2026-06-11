@@ -1,64 +1,199 @@
 <div align="center">
 
-# 🛠️ HomeHero API – Server Side
-<br/><br/>
+# 🏠 HomeHero — Server
 
-**The robust backend engine powering HomeHero: Secure API endpoints, real-time data processing, and protected database management.**
+### _The backbone powering the HomeHero services platform._
 
-<img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js"/>
-<img src="https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white" alt="Express"/>
-<img src="https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white" alt="MongoDB"/>
-<img src="https://img.shields.io/badge/JWT-000000?style=for-the-badge&logo=JSON%20web%20tokens&logoColor=white" alt="JWT"/>
-<img src="https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel"/>
+[![Live API](https://img.shields.io/badge/🚀_Deployed_on-Vercel-000000?style=for-the-badge&logo=vercel)](https://vercel.com/)
+[![Node.js](https://img.shields.io/badge/Node.js-Express_5-339933?style=for-the-badge&logo=node.js)](https://nodejs.org/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=for-the-badge&logo=mongodb)](https://www.mongodb.com/atlas)
+[![License](https://img.shields.io/badge/License-ISC-blue?style=for-the-badge)](LICENSE)
 
 </div>
 
-## 📖 Overview
-This repository contains the RESTful API for **HomeHero**. It handles sensitive operations including user authorization verification, service management (CRUD), and the booking logic that ensures data integrity across the platform.
+---
+
+## ✨ About
+
+**HomeHero Server** is the RESTful API backend for the HomeHero platform. It handles users, services, bookings, reviews, and role-based statistics — all backed by **MongoDB Atlas** and deployed on **Vercel**.
+
+🌐 **Frontend:** [https://hero-home-service.web.app/](https://hero-home-service.web.app/)
 
 ---
 
-## 🛡️ Core Backend Features
+## 📡 API Overview
 
-* **JWT Authentication:** Custom middleware to verify JSON Web Tokens, ensuring only authorized users can modify services or view private bookings.
-* **Security & Validation:** Implementation of `cors` for cross-origin resource sharing and `dotenv` for secure environment variable management.
-* **MongoDB Aggregation:** Advanced queries to power the "Top 6 Rated" services and real-time search filtering.
-* **Role-Based Logic:** Backend checks to prevent users from booking their own services or deleting data belonging to other providers.
-* **Error Handling:** Global error-handling middleware to ensure clear, consistent API responses.
+### 🔐 User & Role Routes
+
+| Method  | Endpoint             | Description                       |
+| ------- | -------------------- | --------------------------------- |
+| `POST`  | `/users`             | Register or find an existing user |
+| `GET`   | `/users/role/:email` | Get a user's role                 |
+| `GET`   | `/all-users`         | Get all users (Admin only)        |
+| `PATCH` | `/users/admin/:id`   | Update a user's role              |
+
+### 🛠️ Service Routes
+
+| Method   | Endpoint                | Description                                          |
+| -------- | ----------------------- | ---------------------------------------------------- |
+| `GET`    | `/services`             | Get all services (paginated, filterable, searchable) |
+| `GET`    | `/services/:id`         | Get a single service by ID                           |
+| `GET`    | `/latest-services`      | Get the latest/top-rated services                    |
+| `GET`    | `/services/user/:email` | Get services listed by a provider                    |
+| `POST`   | `/services`             | Create a new service                                 |
+| `PATCH`  | `/services/:id`         | Update a service                                     |
+| `DELETE` | `/services/:id`         | Delete a service                                     |
+
+### 📅 Booking Routes
+
+| Method   | Endpoint        | Description          |
+| -------- | --------------- | -------------------- |
+| `GET`    | `/bookings`     | Get all bookings     |
+| `POST`   | `/bookings`     | Create a new booking |
+| `DELETE` | `/bookings/:id` | Cancel a booking     |
+
+### ⭐ Review Routes
+
+| Method | Endpoint                      | Description               |
+| ------ | ----------------------------- | ------------------------- |
+| `POST` | `/services/:serviceId/review` | Add a review to a service |
+
+### 📊 Stats Routes
+
+| Method | Endpoint                 | Description                   |
+| ------ | ------------------------ | ----------------------------- |
+| `GET`  | `/admin-stats`           | Platform-wide stats for admin |
+| `GET`  | `/provider-stats/:email` | Stats for a service provider  |
+| `GET`  | `/user-stats/:email`     | Stats for a regular customer  |
 
 ---
 
-## 📡 API Endpoints (Quick Reference)
+## 🔍 Query Parameters — `/services`
 
-### 🔓 Public Endpoints
-| Method | Endpoint | Description |
-|:--- |:--- |:--- |
-| `GET` | `/services` | Fetch all available services (with search/filter) |
-| `GET` | `/services/:id` | Get detailed information for a single service |
-| `GET` | `/top-rated` | Get the 6 highest-rated services for the home page |
+The services endpoint supports powerful filtering:
 
-### 🔐 Protected Endpoints (Requires JWT)
-| Method | Endpoint | Description |
-|:--- |:--- |:--- |
-| `POST` | `/services` | Add a new household service |
-| `PATCH` | `/services/:id` | Update a service (Provider only) |
-| `DELETE` | `/services/:id` | Delete a service (Provider only) |
-| `POST` | `/bookings` | Create a new booking request |
-| `GET` | `/my-bookings` | Fetch bookings made by the current user |
-| `GET` | `/my-services` | Fetch services listed by the current provider |
+| Param       | Type   | Description                                  |
+| ----------- | ------ | -------------------------------------------- |
+| `page`      | number | Page number (default: 1)                     |
+| `limit`     | number | Items per page (default: 20)                 |
+| `category`  | string | Filter by category                           |
+| `minPrice`  | number | Minimum price filter                         |
+| `maxPrice`  | number | Maximum price filter                         |
+| `search`    | string | Search name, description, category, provider |
+| `sortBy`    | string | Field to sort by (default: `createdAt`)      |
+| `sortOrder` | string | `asc` or `desc` (default: `desc`)            |
 
 ---
 
-## 🛠️ Tech Stack & Dependencies
+## 🛠️ Tech Stack
 
-* **Runtime:** Node.js
-* **Framework:** Express.js
-* **Database:** MongoDB (via MongoDB Atlas)
-* **Security:** JWT (JsonWebToken), Firebase Admin SDK
-* **Deployment:** Vercel
+| Category    | Technology                          |
+| ----------- | ----------------------------------- |
+| Runtime     | Node.js                             |
+| Framework   | Express 5                           |
+| Database    | MongoDB Atlas (via Mongoose driver) |
+| Environment | dotenv                              |
+| CORS        | cors                                |
+| Deployment  | Vercel                              |
 
 ---
 
-## ⚙️ Environment Variables Setup
+## 🗂️ Project Structure
 
-To run this server locally, create a `.env` file in the root directory and add:
+```
+home-hero-server/
+├── index.js          # Main server entry point
+├── .env              # Environment variables (not committed)
+├── .vercel/          # Vercel deployment config
+├── package.json
+└── .gitignore
+```
+
+---
+
+## ⚡ Getting Started
+
+### Prerequisites
+
+- Node.js ≥ 18
+- A MongoDB Atlas cluster
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/habib-web-dev1/home-hero-server.git
+cd home-hero-server
+
+# Install dependencies
+npm install
+```
+
+### Environment Variables
+
+Create a `.env` file in the root:
+
+```env
+DB_USER=your_mongodb_username
+DB_PASS=your_mongodb_password
+PORT=5000
+```
+
+### Run Locally
+
+```bash
+npm start
+```
+
+Server will be running at [http://localhost:5000](http://localhost:5000).
+
+You should see:
+
+```json
+{
+  "message": "HomeHero Server Running",
+  "version": "2.0.0",
+  "status": "healthy"
+}
+```
+
+---
+
+## 🚀 Deployment
+
+This server is deployed on **Vercel**. The `vercel.json` (if present) or default Node.js preset handles routing.
+
+To deploy your own instance:
+
+```bash
+npm install -g vercel
+vercel
+```
+
+---
+
+## 🔒 Security Notes
+
+- Input validation on all service creation requests
+- ObjectId format validation before DB queries
+- Email format validation on relevant endpoints
+- CORS restricted to known origins
+- Environment variables used for all secrets
+
+---
+
+## 🔗 Related Repositories
+
+- 💻 **Frontend / Client:** [home-hero-client](https://github.com/habib-web-dev1/home-hero-client)
+
+---
+
+## 📄 License
+
+This project is for portfolio and demonstration purposes.
+
+---
+
+<div align="center">
+  Built with ❤️ by <a href="https://github.com/habib-web-dev1">habib-web-dev1</a>
+</div>
