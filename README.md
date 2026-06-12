@@ -190,7 +190,7 @@ vercel
 
 ## 📄 License
 
-This project is for portfolio and demonstration purposes.
+This project is for portfolio, Resume and demonstration purposes.
 
 ---
 
